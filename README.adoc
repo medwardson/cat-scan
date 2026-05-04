@@ -1,0 +1,121 @@
+= Ailurophile
+
+A lover of cats. This one watches your Puma and tells you how it's doing.
+
+A lightweight sidecar that polls https://puma.io[Puma]'s control/stats socket and pushes metrics to AWS CloudWatch and/or an OTLP-compatible endpoint (e.g. Grafana Alloy).
+
+Designed for ECS Fargate tasks where Puma runs in a sibling container sharing the same network namespace.
+
+== Metrics
+
+[cols="1,1,2"]
+|===
+| Name | Type | Description
+
+| `Backlog` / `puma.backlog`
+| Gauge
+| Total requests queued across all workers
+
+| `Running` / `puma.running`
+| Gauge
+| Total busy threads
+
+| `PoolCapacity` / `puma.pool_capacity`
+| Gauge
+| Total available thread capacity
+
+| `MaxThreads` / `puma.max_threads`
+| Gauge
+| Total configured max threads
+
+| `WorkerCount` / `puma.worker_count`
+| Gauge
+| Number of Puma worker processes
+
+| `WorkerBacklog` / `puma.worker.backlog`
+| Gauge
+| Per-worker backlog (includes `WorkerIndex` dimension/attribute)
+|===
+
+CloudWatch metrics use the configured namespace (default `Puma`) with `ClusterName` and `ServiceName` dimensions.
+OTLP metrics include `ecs.cluster.name` and `ecs.service.name` attributes.
+
+== Configuration
+
+All configuration is via environment variables.
+
+[cols="2,1,3"]
+|===
+| Variable | Default | Description
+
+| `PUMA_CONTROL_URL`
+| `http://127.0.0.1:9293`
+| Puma control socket URL
+
+| `POLL_INTERVAL`
+| `10s`
+| How often to poll Puma stats
+
+| `CLOUDWATCH_ENABLED`
+| `true`
+| Enable CloudWatch publishing
+
+| `CLOUDWATCH_NAMESPACE`
+| `Puma`
+| CloudWatch metric namespace
+
+| `AWS_REGION`
+| _(required if CloudWatch enabled)_
+| AWS region for CloudWatch API
+
+| `ECS_CLUSTER_NAME`
+|
+| CloudWatch dimension / OTLP attribute
+
+| `ECS_SERVICE_NAME`
+|
+| CloudWatch dimension / OTLP attribute
+
+| `OTLP_ENABLED`
+| `true`
+| Enable OTLP metric publishing
+
+| `OTLP_ENDPOINT`
+| `http://localhost:4318`
+| OTLP HTTP endpoint
+
+| `HEALTH_PORT`
+| `8090`
+| Port for `/healthz` endpoint
+
+| `LOG_LEVEL`
+| `info`
+| Log level (`debug`, `info`, `warn`, `error`)
+|===
+
+== Puma setup
+
+Enable the control socket in `config/puma.rb`:
+
+[source,ruby]
+----
+activate_control_app "tcp://127.0.0.1:9293", { no_token: true, data_only: true }
+----
+
+Ailurophile handles both single-process and clustered (multi-worker) Puma configurations automatically.
+
+== Docker
+
+[source,bash]
+----
+docker build -t ailurophile .
+docker run -e AWS_REGION=us-west-2 -e ECS_CLUSTER_NAME=my-cluster -e ECS_SERVICE_NAME=web ailurophile
+----
+
+== Development
+
+[source,bash]
+----
+go build ./...
+go vet ./...
+----

@@ -1,0 +1,7 @@
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+README.adoc
+mise.development.toml
