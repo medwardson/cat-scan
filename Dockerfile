@@ -14,17 +14,15 @@ RUN set -eux; \
     go build \
       -ldflags="-s -w" \
       -o /ailurophile \
-      .
+      . && \
+  mkdir -p /rootfs/run
 
-FROM alpine:3.22
-
-RUN apk add --no-cache ca-certificates
+FROM scratch
 
 LABEL org.opencontainers.image.title="ailurophile"
 LABEL org.opencontainers.image.description="Puma metrics sidecar for CloudWatch and OTLP"
 
+COPY --from=builder /rootfs/ /
 COPY --from=builder /ailurophile /ailurophile
-
-EXPOSE 8090
 
 ENTRYPOINT ["/ailurophile"]

@@ -1,85 +1,44 @@
 package main
 
 import (
-	"encoding/json"
-	"log/slog"
-	"net/http"
-	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
-func TestHealthServer_InitiallyUnhealthy(t *testing.T) {
-	h := NewHealthServer(slog.Default())
+func useTempPIDFile(t *testing.T) {
+	t.Helper()
+	orig := pidFile
+	pidFile = filepath.Join(t.TempDir(), "ailurophile.pid")
+	t.Cleanup(func() { pidFile = orig })
+}
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
-	rec := httptest.NewRecorder()
-	h.handleHealthz(rec, req)
+func TestCheckHealth_Healthy(t *testing.T) {
+	useTempPIDFile(t)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, want 503", rec.Code)
+	if err := writePIDFile(); err != nil {
+		t.Fatalf("writePIDFile() error: %v", err)
 	}
 
-	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
-	if body["status"] != "error" {
-		t.Errorf("status = %q, want error", body["status"])
+	if code := checkHealth(); code != 0 {
+		t.Errorf("checkHealth() = %d, want 0", code)
 	}
 }
 
-func TestHealthServer_Healthy(t *testing.T) {
-	h := NewHealthServer(slog.Default())
-	h.SetHealthy()
+func TestCheckHealth_NoPIDFile(t *testing.T) {
+	useTempPIDFile(t)
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
-	rec := httptest.NewRecorder()
-	h.handleHealthz(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rec.Code)
-	}
-
-	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
-	if body["status"] != "ok" {
-		t.Errorf("status = %q, want ok", body["status"])
+	if code := checkHealth(); code != 1 {
+		t.Errorf("checkHealth() = %d, want 1", code)
 	}
 }
 
-func TestHealthServer_UnhealthyWithMessage(t *testing.T) {
-	h := NewHealthServer(slog.Default())
-	h.SetUnhealthy("connection refused")
+func TestCheckHealth_StaleProcess(t *testing.T) {
+	useTempPIDFile(t)
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
-	rec := httptest.NewRecorder()
-	h.handleHealthz(rec, req)
+	os.WriteFile(pidFile, []byte("999999999"), 0644)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, want 503", rec.Code)
-	}
-
-	var body map[string]string
-	json.NewDecoder(rec.Body).Decode(&body)
-	if body["message"] != "connection refused" {
-		t.Errorf("message = %q, want 'connection refused'", body["message"])
-	}
-}
-
-func TestHealthServer_HealthyThenUnhealthy(t *testing.T) {
-	h := NewHealthServer(slog.Default())
-
-	h.SetHealthy()
-	req := httptest.NewRequest("GET", "/healthz", nil)
-	rec := httptest.NewRecorder()
-	h.handleHealthz(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("after SetHealthy: status = %d, want 200", rec.Code)
-	}
-
-	h.SetUnhealthy("poll failed")
-	req = httptest.NewRequest("GET", "/healthz", nil)
-	rec = httptest.NewRecorder()
-	h.handleHealthz(rec, req)
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("after SetUnhealthy: status = %d, want 503", rec.Code)
+	if code := checkHealth(); code != 1 {
+		t.Errorf("checkHealth() = %d, want 1", code)
 	}
 }

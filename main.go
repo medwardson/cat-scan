@@ -10,6 +10,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--status" {
+		os.Exit(checkHealth())
+	}
+
 	// Load configuration
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -25,6 +29,12 @@ func main() {
 
 	logger.Info("ailurophile starting")
 	cfg.LogConfig(logger)
+
+	if err := writePIDFile(); err != nil {
+		logger.Error("failed to write pid file", "error", err)
+		os.Exit(1)
+	}
+	defer removePIDFile()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -53,10 +63,6 @@ func main() {
 		logger.Info("OTLP publisher initialized")
 	}
 
-	// Start health server
-	health := NewHealthServer(logger)
-	httpSrv := health.ListenAndServe(cfg.HealthPort)
-
 	// Set up signal handling for graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
@@ -71,7 +77,6 @@ func main() {
 		stats, err := pumaClient.FetchStats()
 		if err != nil {
 			logger.Warn("failed to fetch puma stats", "error", err)
-			health.SetUnhealthy(err.Error())
 			return
 		}
 
@@ -94,8 +99,6 @@ func main() {
 				logger.Warn("failed to publish to OTLP", "error", err)
 			}
 		}
-
-		health.SetHealthy()
 	}
 
 	// Run first poll immediately
@@ -111,15 +114,10 @@ func main() {
 			// Stop accepting new work
 			ticker.Stop()
 
-			// Shutdown health server
+			// Flush OTLP metrics
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer shutdownCancel()
 
-			if err := httpSrv.Shutdown(shutdownCtx); err != nil {
-				logger.Error("health server shutdown error", "error", err)
-			}
-
-			// Flush OTLP metrics
 			if otlpPublisher != nil {
 				if err := otlpPublisher.Shutdown(shutdownCtx); err != nil {
 					logger.Error("OTLP shutdown error", "error", err)

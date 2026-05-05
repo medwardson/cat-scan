@@ -20,7 +20,6 @@ type Config struct {
 	ECSServiceName      string
 	OTLPEndpoint        string
 	OTLPEnabled         bool
-	HealthPort          int
 	LogLevel            slog.Level
 }
 
@@ -55,13 +54,6 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// Parse HEALTH_PORT
-	healthPortStr := envOrDefault("HEALTH_PORT", "8090")
-	cfg.HealthPort, err = strconv.Atoi(healthPortStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid HEALTH_PORT %q: %w", healthPortStr, err)
-	}
-
 	// Parse LOG_LEVEL
 	cfg.LogLevel, err = parseLogLevel(envOrDefault("LOG_LEVEL", "info"))
 	if err != nil {
@@ -88,7 +80,6 @@ func (c *Config) LogConfig(logger *slog.Logger) {
 		"ecs_service_name", c.ECSServiceName,
 		"otlp_enabled", c.OTLPEnabled,
 		"otlp_endpoint", c.OTLPEndpoint,
-		"health_port", c.HealthPort,
 		"log_level", c.LogLevel.String(),
 	)
 }

@@ -26,9 +26,6 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.OTLPEndpoint != "http://localhost:4318" {
 		t.Errorf("OTLPEndpoint = %q, want default", cfg.OTLPEndpoint)
 	}
-	if cfg.HealthPort != 8090 {
-		t.Errorf("HealthPort = %d, want 8090", cfg.HealthPort)
-	}
 	if cfg.LogLevel != slog.LevelInfo {
 		t.Errorf("LogLevel = %v, want Info", cfg.LogLevel)
 	}
@@ -41,7 +38,6 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	t.Setenv("CLOUDWATCH_NAMESPACE", "MyApp")
 	t.Setenv("OTLP_ENABLED", "false")
 	t.Setenv("OTLP_ENDPOINT", "http://otel:4318")
-	t.Setenv("HEALTH_PORT", "9090")
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("ECS_CLUSTER_NAME", "my-cluster")
 	t.Setenv("ECS_SERVICE_NAME", "web")
@@ -62,9 +58,6 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	}
 	if cfg.OTLPEndpoint != "http://otel:4318" {
 		t.Errorf("OTLPEndpoint = %q", cfg.OTLPEndpoint)
-	}
-	if cfg.HealthPort != 9090 {
-		t.Errorf("HealthPort = %d", cfg.HealthPort)
 	}
 	if cfg.LogLevel != slog.LevelDebug {
 		t.Errorf("LogLevel = %v", cfg.LogLevel)
@@ -103,16 +96,6 @@ func TestLoadConfig_InvalidBool(t *testing.T) {
 	_, err := LoadConfig()
 	if err == nil {
 		t.Error("expected error for invalid CLOUDWATCH_ENABLED")
-	}
-}
-
-func TestLoadConfig_InvalidHealthPort(t *testing.T) {
-	t.Setenv("HEALTH_PORT", "abc")
-	t.Setenv("CLOUDWATCH_ENABLED", "false")
-
-	_, err := LoadConfig()
-	if err == nil {
-		t.Error("expected error for invalid HEALTH_PORT")
 	}
 }
 
