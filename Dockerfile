@@ -22,6 +22,7 @@ FROM scratch
 LABEL org.opencontainers.image.title="ailurophile"
 LABEL org.opencontainers.image.description="Puma metrics sidecar for CloudWatch and OTLP"
 
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /rootfs/ /
 COPY --from=builder /ailurophile /ailurophile
 
